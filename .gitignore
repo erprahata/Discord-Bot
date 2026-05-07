@@ -1,0 +1,14 @@
+# Node.js dependencies (Library)
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Environment Variables (SANGAT RAHASIA)
+.env
+
+# Local Database (Agar data level member tidak tertimpa/terekspos)
+levels.json
+
+# OS generated files
+.DS_Store
+Thumbs.db
