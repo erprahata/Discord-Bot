@@ -1,7 +1,4 @@
-from ds_python_interpreter import execute_file_generation
-
-# Menulis konten README.md
-readme_content = """# 🌐 KERNEL System v2 — RHT ALPHA
+"""# 🌐 KERNEL System v2 — RHT ALPHA
 
 ![rhtlabs Banner](https://img.shields.io/badge/rhtlabs-Digital_Team_System-00d8d6?style=for-the-badge&logo=target)
 ![Version](https://img.shields.io/badge/Version-2.0.0--Beta-ff3f34?style=for-the-badge)
