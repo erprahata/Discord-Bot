@@ -24,7 +24,7 @@ module.exports = {
     async execute(interaction) {
         // --- HARD SECURITY CHECK ---
         // Ganti 'ID_DISCORD_ANDA' dengan ID Discord asli Anda agar benar-benar hanya Anda yang bisa akses
-        const DEVELOPER_ID = '729357135426617374A'; 
+        const DEVELOPER_ID = '729357135426617374'; 
         if (interaction.user.id !== DEVELOPER_ID) {
             return interaction.reply({ 
                 content: '❌ **[ACCESS DENIED]** Anda tidak memiliki hak akses ROOT untuk protokol ini.', 
