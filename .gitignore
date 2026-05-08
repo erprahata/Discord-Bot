@@ -12,3 +12,5 @@ levels.json
 # OS generated files
 .DS_Store
 Thumbs.db
+afk.json
+tasks.json
