@@ -1,9 +1,11 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const Canvas = require('canvas'); // Mesin Pelukis Profil
+const Canvas = require('canvas');
 
-// Ganti dengan channel ID datalog Anda
+// IMPORT DATA ACHIEVEMENT UNTUK MENDAPATKAN TIER-NYA
+const { KERNEL_ACHIEVEMENTS } = require('../utils/achievements'); 
+
 const dataLogChannelId = '1482406935599906836'; 
 
 module.exports = {
@@ -16,105 +18,140 @@ module.exports = {
                 .setRequired(false)),
 
     async execute(interaction) {
-        // Tampilkan 'Thinking' karena proses melukis gambar butuh waktu
         await interaction.deferReply(); 
 
         const target = interaction.options.getUser('target') || interaction.user;
-        const db = JSON.parse(fs.readFileSync(path.join(__dirname, '../../levels.json'), 'utf8'));
-        const userData = db[target.id];
-
-        if (!userData) {
-            return interaction.editReply({ content: `❌ **Data Kosong.** Sinyal operasional <@${target.id}> belum terdeteksi dalam matriks KERNEL.` });
+        const dbPath = path.join(__dirname, '../../levels.json');
+        
+        // Cek apakah database ada
+        if (!fs.existsSync(dbPath)) {
+            return interaction.editReply({ content: '❌ Database belum terbentuk.' });
         }
+        
+        const db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+        const userData = db[target.id] || { level: 1, xp: 0, unlockedAchievements: [] };
+
+        // === IDENTIFIKASI ROOT SYSADMIN ===
+        const DEVELOPER_ID = '729357135426617374';
+        const isOwner = target.id === DEVELOPER_ID;
 
         try {
-            // --- INITIATE PEP (PROTOCOL EVOLUSI PROFIL) ---
-
-            // 1. Buat Kanvas (Sesuai cetak biru: 600x200px)
+            // 1. Buat Kanvas (600x200px)
             const canvas = Canvas.createCanvas(600, 200);
             const ctx = canvas.getContext('2d');
 
-            // 2. Tempel Background: bg_rank.png
+            // 2. Tempel Background
             const bgPath = path.join(__dirname, '../../assets/backgrounds/bg_rank.png');
             if (fs.existsSync(bgPath)) {
                 const background = await Canvas.loadImage(bgPath);
                 ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
             } else {
-                // Fallback jika background tidak ditemukan
                 ctx.fillStyle = '#1e1f22';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
 
             // 3. Merender Avatar Lingkaran (Left Side)
-            // Area avatar: X: 35, Y: 40, Diameter: 120
-            ctx.save(); // Simpan state canvas sebelum masking
+            ctx.save(); 
             ctx.beginPath();
-            ctx.arc(35 + 60, 40 + 60, 60, 0, Math.PI * 2, true); // (x, y, radius, startAngle, endAngle)
+            ctx.arc(35 + 60, 40 + 60, 60, 0, Math.PI * 2, true); 
             ctx.closePath();
-            ctx.clip(); // Masking dimulai
+            ctx.clip(); 
 
             const avatar = await Canvas.loadImage(target.displayAvatarURL({ extension: 'png' }));
             ctx.drawImage(avatar, 35, 40, 120, 120);
-            ctx.restore(); // Kembalikan state canvas (matikan masking)
+            ctx.restore(); 
 
-            // 4. Injeksi Teks Dinamis (Right Side)
-            // Menggunakan font sans-serif default server
-            
-            // Nama User (Bold)
+            // 4. INJEKSI TEKS DINAMIS
+            // Nama User
             ctx.font = 'bold 36px sans-serif';
             ctx.fillStyle = '#ffffff';
             ctx.fillText(target.username, 180, 70);
 
-            // Status // Title (Italic, placeholder "RHT OPERATOR")
+            // Status Title
             ctx.font = 'italic 18px sans-serif';
-            ctx.fillStyle = '#ff9f43'; // Oranye status
-            ctx.fillText(`STATUS: [ RHT OPERATOR // KERNEL ]`, 180, 100);
+            ctx.fillStyle = isOwner ? '#ff0000' : '#ff9f43'; 
+            const statusText = isOwner ? 'STATUS: [ SYSADMIN // ROOT KERNEL ]' : 'STATUS: [ RHT OPERATOR // KERNEL ]';
+            ctx.fillText(statusText, 180, 100);
 
-            // Level ("LVL. GOD" -> Placeholder dynamic)
+            // ==========================================
+            // LOGIKA LEVEL & EXP (GOD MODE OVERRIDE)
+            // ==========================================
             ctx.font = 'bold 45px sans-serif';
-            ctx.fillStyle = '#ffffff';
-            ctx.textAlign = 'right'; // Teks rata kanan
-            ctx.fillText(`LVL. ${userData.level || 0}`, 565, 80);
-
-            // EXP count (Small text)
-            ctx.font = '16px sans-serif';
-            ctx.fillStyle = '#b2bec3';
             ctx.textAlign = 'right';
-            const reqExp = (userData.level || 1) * 100;
-            ctx.fillText(`EXP: ${userData.xp || 0} / ${reqExp}`, 565, 120);
-            ctx.textAlign = 'left'; // Reset rata teks
 
-            // 5. Gambar Bar XP Oranye
-            // Area Bar: X: 180, Y: 130, W: 385, H: 20
+            if (isOwner) {
+                // Tampilan Khusus Owner
+                ctx.fillStyle = '#ff0000'; // Merah
+                ctx.fillText(`LVL. ???`, 565, 80);
+                
+                ctx.font = '16px sans-serif';
+                ctx.fillText(`EXP: MAX / MAX`, 565, 120);
+            } else {
+                // Tampilan Member Biasa
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(`LVL. ${userData.level}`, 565, 80);
+                
+                ctx.font = '16px sans-serif';
+                ctx.fillStyle = '#b2bec3';
+                const reqExp = userData.level * 100;
+                ctx.fillText(`EXP: ${userData.xp} / ${reqExp}`, 565, 120);
+            }
+            ctx.textAlign = 'left'; // Reset rata kiri untuk baris selanjutnya
+
+            // ==========================================
+            // LOGIKA BAR EXP
+            // ==========================================
             const barWidth = 385;
-            const barProgress = (userData.xp / reqExp) * barWidth;
+            let barProgress = 0;
             
-            ctx.fillStyle = '#4a4d55'; // Warna background bar kosong
+            if (isOwner) {
+                barProgress = barWidth; // Mentok Kanan
+            } else {
+                const reqExp = userData.level * 100;
+                barProgress = Math.min((userData.xp / reqExp) * barWidth, barWidth);
+            }
+
+            // Background Bar
+            ctx.fillStyle = '#4a4d55'; 
             ctx.fillRect(180, 130, barWidth, 20);
 
-            ctx.fillStyle = '#ff9f43'; // Warna progress bar oranye
+            // Progress Bar (Merah untuk owner, Oranye untuk user biasa)
+            ctx.fillStyle = isOwner ? '#ff0000' : '#ff9f43'; 
             ctx.fillRect(180, 130, barProgress, 20);
 
             // ==========================================
-            // 6. JEJERAN LENCANA (BADGE AREA)
-            // Area: Bottom Right (X: 180, Y: 160)
+            // REFINEMENT: SORTIR & LIMITASI LENCANA
             // ==========================================
             if (userData.unlockedAchievements && userData.unlockedAchievements.length > 0) {
-                // Teks Label Kecil
                 ctx.font = '14px sans-serif';
                 ctx.fillStyle = '#636e72';
                 ctx.fillText('SECURITY BADGES UNLOCKED:', 180, 162);
 
-                const badgesToDisplay = userData.unlockedAchievements;
-                const badgeSize = 32; // Ukuran badge kecil di profil
+                // 1. Berikan bobot pada tiap tier untuk keperluan sorting
+                const tierWeights = { 'Red': 4, 'Gold': 3, 'Silver': 2, 'Bronze': 1 };
+
+                // 2. Petakan ID achievement milik user ke objek aslinya
+                let userBadges = userData.unlockedAchievements.map(id => 
+                    KERNEL_ACHIEVEMENTS.find(ach => ach.id === id)
+                ).filter(Boolean); // Filter untuk mencegah error undefined
+
+                // 3. Sortir dari tier terberat (Red) ke terendah (Bronze)
+                userBadges.sort((a, b) => tierWeights[b.tier] - tierWeights[a.tier]);
+
+                // 4. Tentukan batas maksimal tampilan
+                const maxDisplay = 5;
+                const badgesToDisplay = userBadges.slice(0, maxDisplay);
+                const remainingBadges = userBadges.length - maxDisplay;
+
+                const badgeSize = 32; 
                 const badgeSpacing = 10;
                 let currentX = 180;
                 let currentY = 170;
 
-                // Maksimal 10 lencana yang ditampilkan (cegah overlap)
-                for (let i = 0; i < Math.min(badgesToDisplay.length, 10); i++) {
-                    const achId = badgesToDisplay[i];
-                    const emblemPath = path.join(__dirname, `../../assets/emblems/${achId}.png`);
+                // 5. Gambar maksimal 5 lencana tertinggi
+                for (let i = 0; i < badgesToDisplay.length; i++) {
+                    const ach = badgesToDisplay[i];
+                    const emblemPath = path.join(__dirname, `../../assets/emblems/${ach.id}.png`);
 
                     if (fs.existsSync(emblemPath)) {
                         const emblem = await Canvas.loadImage(emblemPath);
@@ -122,29 +159,22 @@ module.exports = {
                         currentX += badgeSize + badgeSpacing;
                     }
                 }
+
+                // 6. Jika ada sisa, tampilkan teks +X
+                if (remainingBadges > 0) {
+                    ctx.font = 'bold 18px sans-serif';
+                    ctx.fillStyle = '#b2bec3';
+                    ctx.fillText(`+${remainingBadges}`, currentX, currentY + 22);
+                }
             }
 
-            // 7. Konversi Kanvas jadi File Gambar
+            // Konversi & Kirim Gambar
             const rankCard = new AttachmentBuilder(canvas.toBuffer(), { name: `rank-${target.id}.png` });
-
-            // Kirim gambar sebagai respons utama
             await interaction.editReply({ files: [rankCard] });
-
-            // 8. LOG KE DATALOG
-            const dataLogChannel = interaction.client.channels.cache.get(dataLogChannelId);
-            if (dataLogChannel) {
-                const EmbedBuilder = require('discord.js').EmbedBuilder;
-                const auditEmbed = new EmbedBuilder()
-                    .setColor('#00d8d6')
-                    .setTitle('🔍 [TELEMETRY] PROFILE ACCESS')
-                    .setDescription(`Operator <@${interaction.user.id}> melakukan diagnostik profil pada <@${target.id}>.`)
-                    .setTimestamp();
-                await dataLogChannel.send({ embeds: [auditEmbed] });
-            }
 
         } catch (error) {
             console.error('ERROR RENDER RANK PEP:', error);
-            return interaction.editReply({ content: '❌ **[SYSTEM FAULT]** Gagal melakukan render profil. Sinyal telemetri terputus.' });
+            return interaction.editReply({ content: '❌ **[SYSTEM FAULT]** Gagal melakukan render profil.' });
         }
     },
 };
